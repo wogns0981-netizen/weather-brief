@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>강원대학교 원주캠퍼스 등굣길 브리핑</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts (Noto Sans KR) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>a
+  <style>
+    body {
+      font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+      transition: background 0.8s ease, color 0.5s ease;
+    }
+    
+    /* Glassmorphism effects */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+    
+    .glass-card-dark {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Weather Background Gradients */
+    .bg-clear-sky {
+      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 50%, #bae6fd 100%);
+    }
+    .bg-cloudy {
+      background: linear-gradient(135deg, #475569 0%, #64748b 50%, #94a3b8 100%);
+    }
+    .bg-rainy {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
+    }
+    .bg-snowy {
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #e0e7ff 100%);
+    }
+    .bg-dusty {
+      background: linear-gradient(135deg, #78350f 0%, #b45309 50%, #d97706 100%);
+    }
+
+    /* Subtle shimmer animation for loading */
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .animate-pulse-slow {
+      animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Custom scrollbar for hourly strip */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-clear-sky min-h-screen text-slate-800 flex flex-col justify-between p-4 sm:p-6 md:p-8" id="body-bg">
+
+  <!-- Main Container -->
+  <div class="max-w-2xl w-full mx-auto space-y-6">
+    
+    <!-- Top Bar / Header -->
+    <header class="glass-card rounded-3xl p-5 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-600 text-white text-xs font-bold tracking-wide">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5"></i> 강원대학교 원주캠퍼스
+          </span>
+          <span class="text-xs font-medium text-slate-500">흥업면</span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          오늘 등굣길 브리핑 🎒
+        </h1>
+      </div>
+      
+      <button id="refresh-btn" onclick="fetchData()" class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/90 hover:bg-white text-slate-700 font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer border border-slate-200">
+        <i data-lucide="refresh-cw" id="refresh-icon" class="w-4 h-4"></i>
+        <span>새로고침</span>
+      </button>
+    </header>
+
+    <!-- Content Area (Switch between Loading, Content, Error) -->
+    <main id="app-content">
+
+      <!-- 1. LOADING STATE -->
+      <div id="state-loading" class="glass-card rounded-3xl p-8 shadow-xl text-center space-y-6 animate-pulse-slow">
+        <div class="w-16 h-16 bg-sky-500/20 rounded-full flex items-center justify-center mx-auto text-sky-600">
+          <i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-800">원주캠퍼스 날씨 정보를 불러오는 중...</h2>
+          <p class="text-sm text-slate-500 mt-1">Open-Meteo & CAMS 실시간 데이터를 수집하고 있습니다.</p>
+        </div>
+      </div>
+
+      <!-- 2. ERROR STATE -->
+      <div id="state-error" class="hidden glass-card rounded-3xl p-8 shadow-xl text-center space-y-5 border-2 border-red-200">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto text-red-500">
+          <i data-lucide="alert-circle" class="w-9 h-9"></i>
+        </div>
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">데이터를 불러오지 못했습니다</h2>
+          <p class="text-slate-600 text-sm mt-1">네트워크 연결 상태를 확인하고 다시 시도해 주세요.</p>
+        </div>
+        <button onclick="fetchData()" class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-base shadow-lg hover:shadow-xl active:scale-95 transition-all">
+          <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+          <span>다시 시도</span>
+        </button>
+      </div>
+
+      <!-- 3. DATA LOADED CONTENT -->
+      <div id="state-success" class="hidden space-y-6">
+
+        <!-- 3-LINE MAIN BRIEFING CARDS (챙길 것 3줄 크게) -->
+        <section class="space-y-3" aria-label="챙길 것 체크리스트">
+          
+          <!-- Line 1: Umbrella -->
+          <div id="umbrella-card" class="glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 transition-all hover:translate-y-[-2px]">
+            <div id="umbrella-icon-box" class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-md">
+              <i id="umbrella-icon" data-lucide="umbrella" class="w-8 h-8 sm:w-9 sm:h-9"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">우산 여부</span>
+                <span id="umbrella-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold"></span>
+              </div>
+              <h2 id="umbrella-title" class="text-xl sm:text-2xl font-black text-slate-900 truncate mt-0.5"></h2>
+              <p id="umbrella-desc" class="text-xs sm:text-sm font-medium text-slate-600 mt-1"></p>
+            </div>
+          </div>
+
+          <!-- Line 2: Outerwear -->
+          <div id="jacket-card" class="glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 transition-all hover:translate-y-[-2px]">
+            <div id="jacket-icon-box" class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-md">
+              <i id="jacket-icon" data-lucide="shirt" class="w-8 h-8 sm:w-9 sm:h-9"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">겉옷 여부</span>
+                <span id="jacket-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold"></span>
+              </div>
+              <h2 id="jacket-title" class="text-xl sm:text-2xl font-black text-slate-900 truncate mt-0.5"></h2>
+              <p id="jacket-desc" class="text-xs sm:text-sm font-medium text-slate-600 mt-1"></p>
+            </div>
+          </div>
+
+          <!-- Line 3: Mask -->
+          <div id="mask-card" class="glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 transition-all hover:translate-y-[-2px]">
+            <div id="mask-icon-box" class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-md">
+              <i id="mask-icon" data-lucide="shield-alert" class="w-8 h-8 sm:w-9 sm:h-9"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">마스크 여부</span>
+                <span id="mask-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold"></span>
+              </div>
+              <h2 id="mask-title" class="text-xl sm:text-2xl font-black text-slate-900 truncate mt-0.5"></h2>
+              <p id="mask-desc" class="text-xs sm:text-sm font-medium text-slate-600 mt-1"></p>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- WEATHER & AIR QUALITY METRICS GRID -->
+        <section class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          
+          <!-- Current Temp -->
+          <div class="glass-card rounded-2xl p-4 shadow-md flex flex-col justify-between">
+            <div class="flex justify-between items-center text-slate-500 mb-2">
+              <span class="text-xs font-bold">현재 기온</span>
+              <i data-lucide="thermometer" class="w-4 h-4 text-sky-500"></i>
+            </div>
+            <div>
+              <div class="text-2xl sm:text-3xl font-black text-slate-900" id="val-temp">--°C</div>
+              <p class="text-xs text-slate-500 mt-1">상태: <span id="val-weather-desc" class="font-bold text-slate-700">--</span></p>
+            </div>
+          </div>
+
+          <!-- Apparent Temp -->
+          <div class="glass-card rounded-2xl p-4 shadow-md flex flex-col justify-between">
+            <div class="flex justify-between items-center text-slate-500 mb-2">
+              <span class="text-xs font-bold">체감 온도</span>
+              <i data-lucide="sparkles" class="w-4 h-4 text-indigo-500"></i>
+            </div>
+            <div>
+              <div class="text-2xl sm:text-3xl font-black text-slate-900" id="val-apparent-temp">--°C</div>
+              <p class="text-xs text-slate-500 mt-1">기준: <span class="font-bold text-slate-700">10°C 이하 겉옷</span></p>
+            </div>
+          </div>
+
+          <!-- Rain Prob (9-18h) -->
+          <div class="glass-card rounded-2xl p-4 shadow-md flex flex-col justify-between">
+            <div class="flex justify-between items-center text-slate-500 mb-2">
+              <span class="text-xs font-bold">비 올 확률</span>
+              <i data-lucide="cloud-rain" class="w-4 h-4 text-blue-500"></i>
+            </div>
+            <div>
+              <div class="text-2xl sm:text-3xl font-black text-slate-900" id="val-max-rain">--%</div>
+              <p class="text-xs text-slate-500 mt-1">09~18시 최고 확률</p>
+            </div>
+          </div>
+
+          <!-- Dust Level (PM10 / PM2.5) -->
+          <div class="glass-card rounded-2xl p-4 shadow-md flex flex-col justify-between">
+            <div class="flex justify-between items-center text-slate-500 mb-2">
+              <span class="text-xs font-bold">미세 먼지 수치</span>
+              <i data-lucide="wind" class="w-4 h-4 text-amber-500"></i>
+            </div>
+            <div>
+              <div class="text-lg font-extrabold text-slate-900 flex items-baseline gap-1" id="val-dust-pm10">
+                PM10 --
+              </div>
+              <div class="text-xs font-bold text-slate-600 mt-0.5" id="val-dust-pm25">
+                PM2.5 --
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- HOURLY COMMUTE TIMELINE (09:00 ~ 18:00) -->
+        <section class="glass-card rounded-3xl p-5 shadow-lg">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="clock" class="w-4 h-4 text-sky-600"></i>
+              <span>오늘 수업시간별 날씨 예보 (09:00 ~ 18:00)</span>
+            </h3>
+            <span class="text-xs font-semibold text-slate-500">비 확률 (%)</span>
+          </div>
+
+          <div id="hourly-container" class="flex gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar scroll-smooth">
+            <!-- Dynamic Hourly Items inserted here -->
+          </div>
+        </section>
+
+        <!-- LAST UPDATED TIME -->
+        <div class="text-center">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/10 text-slate-700 text-xs font-semibold">
+            <i data-lucide="clock-3" class="w-3.5 h-3.5"></i>
+            마지막 갱신 시각: <span id="val-last-updated" class="font-bold">--:--:--</span>
+          </span>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Footer with attribution -->
+    <footer class="text-center pt-2 pb-4 text-xs font-medium text-slate-700/80 space-y-1">
+      <p>강원대학교 원주캠퍼스 (흥업캠퍼스) 등굣길 맞춤 날씨 브리핑</p>
+      <p class="font-semibold">Weather data by Open-Meteo.com · Air quality: CAMS</p>
+    </footer>
+
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    // Latitude & Longitude for Kangwon National University Wonju Campus (Heungeop-myeon, Wonju)
+    const LAT = 37.3081;
+    const LON = 127.9257;
+
+    // Open-Meteo Weather & Air Quality API Endpoints
+    const WEATHER_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,apparent_temperature,precipitation,weather_code,relative_humidity_2m,wind_speed_10m&hourly=temperature_2m,apparent_temperature,precipitation_probability,weather_code&timezone=Asia%2FSeoul`;
+    const AIR_QUALITY_URL = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${LAT}&longitude=${LON}&current=pm10,pm2_5&hourly=pm10,pm2_5&timezone=Asia%2FSeoul`;
+
+    // Weather Code Interpretation Map (WMO Code)
+    function getWeatherInfo(code) {
+      if (code === 0) return { title: '맑음', icon: 'sun', bgClass: 'bg-clear-sky' };
+      if ([1, 2, 3].includes(code)) return { title: '구름 약간 / 흐림', icon: 'cloud-sun', bgClass: 'bg-cloudy' };
+      if ([45, 48].includes(code)) return { title: '안개 낀 날씨', icon: 'cloud-fog', bgClass: 'bg-cloudy' };
+      if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { title: '비 내림', icon: 'cloud-rain', bgClass: 'bg-rainy' };
+      if ([56, 57, 66, 67, 71, 73, 75, 77, 85, 86].includes(code)) return { title: '눈 내림', icon: 'snowflake', bgClass: 'bg-snowy' };
+      if ([95, 96, 99].includes(code)) return { title: '뇌우', icon: 'cloud-lightning', bgClass: 'bg-rainy' };
+      return { title: '맑음', icon: 'sun', bgClass: 'bg-clear-sky' };
+    }
+
+    // Korean Fine Dust Grade Standards (한국 환경부 대기환경기준)
+    // PM10: 좋음 0~30, 보통 31~80, 나쁨 81~150, 매우나쁨 151~
+    // PM2.5: 좋음 0~15, 보통 16~35, 나쁨 36~75, 매우나쁨 76~
+    function getPm10Grade(val) {
+      if (val <= 30) return { label: '좋음', color: 'text-blue-600', bg: 'bg-blue-100', bad: false };
+      if (val <= 80) return { label: '보통', color: 'text-emerald-600', bg: 'bg-emerald-100', bad: false };
+      if (val <= 150) return { label: '나쁨', color: 'text-amber-600', bg: 'bg-amber-100', bad: true };
+      return { label: '매우나쁨', color: 'text-red-600', bg: 'bg-red-100', bad: true };
+    }
+
+    function getPm25Grade(val) {
+      if (val <= 15) return { label: '좋음', color: 'text-blue-600', bg: 'bg-blue-100', bad: false };
+      if (val <= 35) return { label: '보통', color: 'text-emerald-600', bg: 'bg-emerald-100', bad: false };
+      if (val <= 75) return { label: '나쁨', color: 'text-amber-600', bg: 'bg-amber-100', bad: true };
+      return { label: '매우나쁨', color: 'text-red-600', bg: 'bg-red-100', bad: true };
+    }
+
+    // Fetch and Process Data
+    async function fetchData() {
+      const stateLoading = document.getElementById('state-loading');
+      const stateError = document.getElementById('state-error');
+      const stateSuccess = document.getElementById('state-success');
+      const refreshIcon = document.getElementById('refresh-icon');
+
+      // Show loading spinner
+      stateLoading.classList.remove('hidden');
+      stateError.classList.add('hidden');
+      stateSuccess.classList.add('hidden');
+      if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+      try {
+        const [weatherRes, airRes] = await Promise.all([
+          fetch(WEATHER_URL),
+          fetch(AIR_QUALITY_URL)
+        ]);
+
+        if (!weatherRes.ok || !airRes.ok) throw new Error('Network response failed');
+
+        const weatherData = await weatherRes.json();
+        const airData = await airRes.json();
+
+        renderDashboard(weatherData, airData);
+
+        // Display Success State
+        stateLoading.classList.add('hidden');
+        stateSuccess.classList.remove('hidden');
+      } catch (err) {
+        console.error('Fetch error:', err);
+        stateLoading.classList.add('hidden');
+        stateError.classList.remove('hidden');
+      } finally {
+        if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+      }
+    }
+
+    function renderDashboard(weather, air) {
+      const current = weather.current;
+      const hourly = weather.hourly;
+      const airCurrent = air.current;
+
+      // 1. Current Date/Time Info & Find Today 09:00~18:00 Hourly Data
+      const now = new Date();
+      const todayDateStr = now.toISOString().split('T')[0];
+
+      // Filter hourly indexes for today between 09:00 and 18:00
+      let maxRainProb = 0;
+      let maxRainHour = '';
+      let daytimeMinApparentTemp = current.apparent_temperature;
+
+      const daytimeHours = [];
+
+      if (hourly && hourly.time) {
+        for (let i = 0; i < hourly.time.length; i++) {
+          const timeStr = hourly.time[i]; // e.g. "2026-11-09T09:00"
+          const datePart = timeStr.split('T')[0];
+          const hourNum = parseInt(timeStr.split('T')[1].split(':')[0], 10);
+
+          if (datePart === todayDateStr && hourNum >= 9 && hourNum <= 18) {
+            const prob = hourly.precipitation_probability ? hourly.precipitation_probability[i] : 0;
+            const appTemp = hourly.apparent_temperature ? hourly.apparent_temperature[i] : current.apparent_temperature;
+            const temp = hourly.temperature_2m ? hourly.temperature_2m[i] : current.temperature_2m;
+            const wCode = hourly.weather_code ? hourly.weather_code[i] : 0;
+
+            if (prob > maxRainProb) {
+              maxRainProb = prob;
+              maxRainHour = `${hourNum}시`;
+            }
+            if (appTemp < daytimeMinApparentTemp) {
+              daytimeMinApparentTemp = appTemp;
+            }
+
+            daytimeHours.push({
+              hour: `${hourNum}시`,
+              prob,
+              temp: Math.round(temp),
+              appTemp: Math.round(appTemp),
+              wCode
+            });
+          }
+        }
+      }
+
+      // 2. Evaluate 3 Packing Items Conditions
+
+      // A. Umbrella: Today 09:00~18:00 rain prob >= 50%
+      const needUmbrella = maxRainProb >= 50;
+
+      // B. Outerwear: Apparent temp <= 10°C (current or commute daytime)
+      const currentApparent = Math.round(current.apparent_temperature);
+      const needJacket = currentApparent <= 10 || daytimeMinApparentTemp <= 10;
+
+      // C. Mask: Korean standard PM10 >= 81 or PM2.5 >= 36 ('나쁨' 이상)
+      const pm10Val = Math.round(airCurrent.pm10 || 0);
+      const pm25Val = Math.round(airCurrent.pm2_5 || 0);
+      const pm10Grade = getPm10Grade(pm10Val);
+      const pm25Grade = getPm25Grade(pm25Val);
+
+      const needMask = pm10Grade.bad || pm25Grade.bad;
+
+      // 3. Update Dynamic Background & Theme based on current weather/air
+      const wInfo = getWeatherInfo(current.weather_code);
+      const bodyBg = document.getElementById('body-bg');
+      
+      if (needMask && (pm10Val >= 150 || pm25Val >= 75)) {
+        bodyBg.className = 'bg-dusty min-h-screen text-slate-800 flex flex-col justify-between p-4 sm:p-6 md:p-8';
+      } else {
+        bodyBg.className = `${wInfo.bgClass} min-h-screen text-slate-800 flex flex-col justify-between p-4 sm:p-6 md:p-8`;
+      }
+
+      // 4. Render 3-Line Large Briefing Cards
+
+      // Card 1: Umbrella
+      const umbrellaCard = document.getElementById('umbrella-card');
+      const umbrellaIconBox = document.getElementById('umbrella-icon-box');
+      const umbrellaBadge = document.getElementById('umbrella-badge');
+      const umbrellaTitle = document.getElementById('umbrella-title');
+      const umbrellaDesc = document.getElementById('umbrella-desc');
+
+      if (needUmbrella) {
+        umbrellaCard.className = 'glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 border-sky-600 transition-all hover:translate-y-[-2px]';
+        umbrellaIconBox.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-md bg-gradient-to-br from-sky-500 to-blue-600';
+        umbrellaBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-700';
+        umbrellaBadge.textContent = '필수 지참';
+        umbrellaTitle.textContent = '우산 챙기세요! ☔';
+        umbrellaDesc.textContent = `오전 9시~오후 6시 중 최고 비 확률 ${maxRainProb}% (${maxRainHour} 경 예보)`;
+      } else {
+        umbrellaCard.className = 'glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 border-slate-300 transition-all hover:translate-y-[-2px]';
+        umbrellaIconBox.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-slate-600 shadow-md bg-slate-200/80';
+        umbrellaBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600';
+        umbrellaBadge.textContent = '우산 미필요';
+        umbrellaTitle.textContent = '우산 없어도 괜찮아요 ☀️';
+        umbrellaDesc.textContent = maxRainProb > 0 
+          ? `등교 시간대 강수 확률이 낮습니다. (최고 ${maxRainProb}%)` 
+          : `등교 시간대(09~18시) 비 예보가 없습니다.`;
+      }
+
+      // Card 2: Outerwear
+      const jacketCard = document.getElementById('jacket-card');
+      const jacketIconBox = document.getElementById('jacket-icon-box');
+      const jacketBadge = document.getElementById('jacket-badge');
+      const jacketTitle = document.getElementById('jacket-title');
+      const jacketDesc = document.getElementById('jacket-desc');
+
+      if (needJacket) {
+        jacketCard.className = 'glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 border-indigo-600 transition-all hover:translate-y-[-2px]';
+        jacketIconBox.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-md bg-gradient-to-br from-indigo-500 to-slate-700';
+        jacketBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700';
+        jacketBadge.textContent = '겉옷 챙김';
+        jacketTitle.textContent = '따뜻한 겉옷 챙기세요! 🧥';
+        jacketDesc.textContent = `현재 체감 온도 ${currentApparent}°C (10°C 이하 저온 날씨)`;
+      } else {
+        jacketCard.className = 'glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 border-emerald-500 transition-all hover:translate-y-[-2px]';
+        jacketIconBox.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-md bg-gradient-to-br from-emerald-500 to-teal-600';
+        jacketBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700';
+        jacketBadge.textContent = '가벼운 옷차림';
+        jacketTitle.textContent = '겉옷 없이 가볍게 출발! 👕';
+        jacketDesc.textContent = `현재 체감 온도 ${currentApparent}°C로 온화한 등굣길입니다.`;
+      }
+
+      // Card 3: Mask
+      const maskCard = document.getElementById('mask-card');
+      const maskIconBox = document.getElementById('mask-icon-box');
+      const maskBadge = document.getElementById('mask-badge');
+      const maskTitle = document.getElementById('mask-title');
+      const maskDesc = document.getElementById('mask-desc');
+
+      if (needMask) {
+        maskCard.className = 'glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 border-amber-600 transition-all hover:translate-y-[-2px]';
+        maskIconBox.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-md bg-gradient-to-br from-amber-500 to-red-600';
+        maskBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800';
+        maskBadge.textContent = '마스크 착용';
+        maskTitle.textContent = '마스크 착용 권장! 😷';
+        
+        let reasonStr = [];
+        if (pm10Grade.bad) reasonStr.push(`미세먼지 ${pm10Val}µg/m³ (${pm10Grade.label})`);
+        if (pm25Grade.bad) reasonStr.push(`초미세먼지 ${pm25Val}µg/m³ (${pm25Grade.label})`);
+        maskDesc.textContent = `${reasonStr.join(', ')} - KF 마스크를 챙기세요.`;
+      } else {
+        maskCard.className = 'glass-card rounded-3xl p-5 sm:p-6 shadow-lg flex items-center gap-4 sm:gap-6 border-l-8 border-teal-500 transition-all hover:translate-y-[-2px]';
+        maskIconBox.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-md bg-gradient-to-br from-teal-400 to-emerald-500';
+        maskBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800';
+        maskBadge.textContent = '공기 양호';
+        maskTitle.textContent = '마스크 미필요 (청정) 🌿';
+        maskDesc.textContent = `미세먼지 ${pm10Grade.label}(${pm10Val}), 초미세먼지 ${pm25Grade.label}(${pm25Val})로 쾌적합니다.`;
+      }
+
+      // 5. Render Detail Metrics
+      document.getElementById('val-temp').textContent = `${Math.round(current.temperature_2m)}°C`;
+      document.getElementById('val-weather-desc').textContent = wInfo.title;
+      document.getElementById('val-apparent-temp').textContent = `${currentApparent}°C`;
+      document.getElementById('val-max-rain').textContent = `${maxRainProb}%`;
+
+      document.getElementById('val-dust-pm10').innerHTML = `
+        <span>미세 ${pm10Val}</span>
+        <span class="text-xs px-2 py-0.5 rounded-md font-bold ${pm10Grade.bg} ${pm10Grade.color}">${pm10Grade.label}</span>
+      `;
+      document.getElementById('val-dust-pm25').innerHTML = `
+        <span>초미세 ${pm25Val}</span>
+        <span class="text-xs px-2 py-0.5 rounded-md font-bold ${pm25Grade.bg} ${pm25Grade.color}">${pm25Grade.label}</span>
+      `;
+
+      // 6. Hourly Strip Timeline Render
+      const hourlyContainer = document.getElementById('hourly-container');
+      hourlyContainer.innerHTML = '';
+
+      if (daytimeHours.length > 0) {
+        daytimeHours.forEach(item => {
+          const itemWInfo = getWeatherInfo(item.wCode);
+          const isHighRain = item.prob >= 50;
+
+          const hourEl = document.createElement('div');
+          hourEl.className = `flex-shrink-0 w-20 p-3 rounded-2xl text-center flex flex-col items-center justify-between border ${
+            isHighRain ? 'bg-sky-100/90 border-sky-300 shadow-sm' : 'bg-white/60 border-white/50'
+          }`;
+          
+          hourEl.innerHTML = `
+            <span class="text-xs font-bold text-slate-600">${item.hour}</span>
+            <div class="my-1 text-sky-600">
+              <i data-lucide="${itemWInfo.icon}" class="w-6 h-6 mx-auto"></i>
+            </div>
+            <span class="text-sm font-black text-slate-800">${item.temp}°</span>
+            <span class="text-[11px] font-bold ${isHighRain ? 'text-blue-600' : 'text-slate-400'} mt-0.5">
+              ☔ ${item.prob}%
+            </span>
+          `;
+          hourlyContainer.appendChild(hourEl);
+        });
+      } else {
+        hourlyContainer.innerHTML = `<p class="text-xs text-slate-500 py-2">오늘 남아있는 수업시간(09:00~18:00) 예보 데이터가 없습니다.</p>`;
+      }
+
+      // 7. Last Updated Timestamp
+      const nowFormatted = new Date().toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      document.getElementById('val-last-updated').textContent = nowFormatted;
+
+      // Re-initialize Lucide icons for dynamically added elements
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    // Initialize app on page load
+    window.onload = function() {
+      fetchData();
+    };
+  </script>
+</body>
+</html>
